@@ -14,15 +14,18 @@
 	<script src="data.js"></script>
 	<script id="vert" type="x-shader/x-vertex">
 		varying vec3 fNormal;
+		varying vec4 fPosition;
 
 		void main() {
 			fNormal = normalMatrix * normal;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+			fPosition = modelViewMatrix * vec4(position, 1.0);
+			gl_Position = projectionMatrix * fPosition;
 		}
 	</script>
 
 	<script id="frag" type="x-shader/x-fragment">
 		varying vec3 fNormal;
+		varying vec4 fPosition;
 
 		void main() {
 			float margin = 0.125;
@@ -30,8 +33,30 @@
 			vec3 L = normalize(vec3(1, 1, 0));
 			vec3 N = normalize(vec3(fNormal.xy, 0));
 			float alpha = dot(L, N) * margin + 1.0 - margin;
-			//
-			gl_FragColor = vec4(vec3(0.827, 0.07, 0.396) * alpha, 1.0);
+			vec3 color = vec3(0.827, 0.07, 0.396);
+
+			vec2 outside = vec2(46.0/327.0, 142.0/325.0) * 0.5;
+			vec2 inside = vec2(20.0/327.0, 129.0/325.0) * 0.5;
+			float bar = 13.0/327.0;
+
+			vec2 pos = fPosition.xy;
+
+			// change color for middle "N"
+			if (
+				(pos.x > -outside.x && pos.x < outside.x)
+				&&
+				(pos.y > -outside.y && pos.y < outside.y)
+				&& ! (
+					(pos.x > -inside.x && pos.x < inside.x)
+					&&
+					(pos.y > -inside.y - bar && pos.y < inside.y - bar)
+				)
+			)
+			{
+				color = vec3(1.0);
+			}
+
+			gl_FragColor = vec4(color * alpha, 1.0);
 		}
 	</script>
 	<script>
