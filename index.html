@@ -1,0 +1,150 @@
+<html>
+<head>
+	<title>Tests: Three.js</title>
+	<style>
+		canvas {
+			width: 300px;
+			height: 300px;
+		}
+	</style>
+</head>
+<body>
+	<script src="three.js/build/three.min.js"></script>
+	<script src="stats.js/build/stats.min.js"></script>
+	<script src="data.js"></script>
+	<script id="vert" type="x-shader/x-vertex">
+		varying vec3 fNormal;
+
+		void main() {
+			fNormal = normalMatrix * normal;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	</script>
+
+	<script id="frag" type="x-shader/x-fragment">
+		varying vec3 fNormal;
+
+		void main() {
+			float margin = 0.125;
+
+			vec3 L = normalize(vec3(1, 1, 0));
+			vec3 N = normalize(vec3(fNormal.xy, 0));
+			float alpha = dot(L, N) * margin + 1.0 - margin;
+			//
+			gl_FragColor = vec4(vec3(0.827, 0.07, 0.396) * alpha, 1.0);
+		}
+	</script>
+	<script>
+		window.requestAnimFrame = (function(){
+			return  window.requestAnimationFrame       ||
+							window.webkitRequestAnimationFrame ||
+							window.mozRequestAnimationFrame    ||
+							function( callback ){
+								window.setTimeout(callback, 1000 / 60);
+							};
+		})();
+
+		var stats = new Stats();
+
+		// Align top-left
+		stats.domElement.style.position = 'absolute';
+		stats.domElement.style.left = '0px';
+		stats.domElement.style.top = '0px';
+
+		document.body.appendChild(stats.domElement);
+
+		var scene = new THREE.Scene();
+		var ratio = window.innerWidth / window.innerHeight;
+		var camera = new THREE.OrthographicCamera(0.5, -0.5, 0.5, -0.5, -1, 1);
+		var renderer = new THREE.WebGLRenderer();
+
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		renderer.setClearColor(0xffffff, 0);
+		document.body.appendChild(renderer.domElement);
+
+		for (var i = 0; i < vertices.length; i += 3) {
+			vertices[i + 0] = 0.5 - vertices[i + 0]/327.0;
+			vertices[i + 1] = 0.5 - vertices[i + 1]/325.0;
+		}
+
+		for (var i = 0; i < indices.length; i++) {
+			indices[i]--;
+		}
+
+		for (var i = 0; i < edges.length; i++) {
+			edges[i]--;
+		}
+
+		var geometry = new THREE.Geometry();
+
+		for (var i = 0; i < vertices.length; i += 3) {
+			geometry.vertices.push(new THREE.Vector3(vertices[i + 0],vertices[i + 1], vertices[i + 2]));
+		}
+
+		for (var i = 0; i < indices.length; i += 3) {
+			geometry.faces.push(new THREE.Face3(indices[i + 2], indices[i + 1], indices[i + 0]));
+		}
+
+		geometry.dynamic = true;
+		geometry.verticesNeedUpdate = true;
+		geometry.normalsNeedUpdate = true;
+
+		geometry.computeFaceNormals();
+
+		var material = new THREE.ShaderMaterial({
+			uniforms: {
+
+			},
+			vertexShader: document.getElementById('vert').innerHTML,
+			fragmentShader: document.getElementById('frag').innerHTML
+		});
+
+		var mesh = new THREE.Mesh(geometry, material);
+
+		scene.add(mesh);
+
+		var t = +new Date() / 1000;
+
+		Math.sgn = function (a) { return (a < 0) ? -1 : (a > 0 ? 1 : 0); }
+
+		function fx (i) {
+			return (edges.indexOf(i) == -1) * 1.0 / 128.0 * (i % 2 - 0.5) * 2;
+		}
+
+		function fy (i) {
+			return (edges.indexOf(i) == -1) * 1.0 / 128.0 * (i % 2 - 0.5) * 2;
+		}
+
+		function render()
+		{
+			stats.begin();
+
+			var dt = +new Date()/1000 - t;
+
+			for (var i = 0; i < vertices.length; i += 3) {
+				var x = Math.sin(Math.PI * t) * fx(i / 3, t);
+				var y = Math.cos(Math.PI * t) * fy(i / 3, t);
+				geometry.vertices[i / 3] = new THREE.Vector3(x + vertices[i + 0], y + vertices[i + 1], vertices[i + 2]);
+			}
+
+			geometry.verticesNeedUpdate = true;
+			geometry.normalsNeedUpdate = true;
+
+			mesh.rotation.z += dt / 10;
+			mesh.scale.x = 1.0 - 1.0 / 16.0;
+			mesh.scale.y = 1.0 - 1.0 / 16.0;
+
+			renderer.render(scene, camera);
+
+			t = +new Date() / 1000;
+
+			stats.end();
+
+			requestAnimFrame(render);
+		}
+
+		requestAnimFrame(render);
+
+	</script>
+</body>
+</html>
