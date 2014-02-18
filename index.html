@@ -24,6 +24,8 @@
 	</script>
 
 	<script id="frag" type="x-shader/x-fragment">
+		uniform sampler2D tex;
+
 		varying vec3 fNormal;
 		varying vec4 fPosition;
 
@@ -31,7 +33,7 @@
 			float margin = 0.125;
 
 			vec3 L = normalize(vec3(1, 1, 0));
-			vec3 N = normalize(vec3(fNormal.xy, 0));
+			vec3 N = normalize(fNormal);
 			float alpha = dot(L, N) * margin + 1.0 - margin;
 			vec3 color = vec3(0.827, 0.07, 0.396);
 
@@ -41,22 +43,7 @@
 
 			vec2 pos = fPosition.xy;
 
-			// change color for middle "N"
-			if (
-				(pos.x > -outside.x && pos.x < outside.x)
-				&&
-				(pos.y > -outside.y && pos.y < outside.y)
-				&& ! (
-					(pos.x > -inside.x && pos.x < inside.x)
-					&&
-					(pos.y > -inside.y - bar && pos.y < inside.y - bar)
-				)
-			)
-			{
-				color = vec3(1.0);
-			}
-
-			gl_FragColor = vec4(color * alpha, 1.0);
+			gl_FragColor = vec4(texture2D(tex, pos + 0.5).xyz * alpha, 1.0);
 		}
 	</script>
 	<script>
@@ -81,7 +68,9 @@
 		var scene = new THREE.Scene();
 		var ratio = window.innerWidth / window.innerHeight;
 		var camera = new THREE.OrthographicCamera(0.5, -0.5, 0.5, -0.5, -1, 1);
-		var renderer = new THREE.WebGLRenderer();
+		var renderer = new THREE.WebGLRenderer({
+			antialias: true
+		});
 
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setClearColor(0xffffff, 0);
@@ -118,7 +107,10 @@
 
 		var material = new THREE.ShaderMaterial({
 			uniforms: {
-
+				tex: {
+					type: 't',
+					value: THREE.ImageUtils.loadTexture('color-map.gif')
+				}
 			},
 			vertexShader: document.getElementById('vert').innerHTML,
 			fragmentShader: document.getElementById('frag').innerHTML
@@ -131,13 +123,30 @@
 		var t = +new Date() / 1000;
 
 		Math.sgn = function (a) { return (a < 0) ? -1 : (a > 0 ? 1 : 0); }
-
-		function fx (i) {
-			return (edges.indexOf(i) == -1) * 1.0 / 128.0 * (i % 2 - 0.5) * 2;
+		Math.distance2 = function (a, b) {
+			var sum = 0;
+			for (var i = 0; i < a.length; i++) {
+				var p = a[i] - b[i];
+				sum += p*p;
+			}
+			return sum;
 		}
 
-		function fy (i) {
-			return (edges.indexOf(i) == -1) * 1.0 / 128.0 * (i % 2 - 0.5) * 2;
+		var light = {
+			x: 0,
+			y: 0
+		};
+
+		function fx (vertex, i, t) {
+			return vertex[i + 0];
+		}
+
+		function fy (vertex, i, t) {
+			return vertex[i + 1];
+		}
+
+		function fz (vertex, i, t) {
+			return vertex[i + 2] - Math.sqrt(Math.distance2([vertex[i + 0], vertex[i + 1]], [light.x * 2, light.y * 2])) * 0.5;
 		}
 
 		function render()
@@ -146,16 +155,25 @@
 
 			var dt = +new Date()/1000 - t;
 
+			light.x = Math.sin(Math.PI * t);
+			light.y = Math.cos(Math.PI * t);
+
 			for (var i = 0; i < vertices.length; i += 3) {
-				var x = Math.sin(Math.PI * t) * fx(i / 3, t);
-				var y = Math.cos(Math.PI * t) * fy(i / 3, t);
-				geometry.vertices[i / 3] = new THREE.Vector3(x + vertices[i + 0], y + vertices[i + 1], vertices[i + 2]);
+				var x = fx(vertices, i, t);
+				var y = fy(vertices, i, t);
+				var z = fz(vertices, i, t);
+				geometry.vertices[~~(i / 3)] = new THREE.Vector3(x, y, z);
 			}
+
+			t = +new Date() / 1000;
+			console.log(geometry.vertices[0].x);
 
 			geometry.verticesNeedUpdate = true;
 			geometry.normalsNeedUpdate = true;
 
-			mesh.rotation.z += dt / 10;
+			geometry.computeFaceNormals();
+
+			mesh.rotation.z += dt / 5;
 			mesh.scale.x = 1.0 - 1.0 / 16.0;
 			mesh.scale.y = 1.0 - 1.0 / 16.0;
 
